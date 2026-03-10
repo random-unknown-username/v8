@@ -58,14 +58,15 @@ const caller = builder.addFunction('caller', kSig_i_v)
   .addBody([kExprCallFunction, callee.index])
   .exportFunc();
 
-const bytes = builder.toBuffer();
-const mod = new WebAssembly.Module(bytes);
+const moduleBytes = builder.toBuffer();
+const mod = new WebAssembly.Module(moduleBytes);
 const inst = new WebAssembly.Instance(mod, {});
 
 // Trigger tier-up (TurboFan compilation with inlining).
+// %WasmTierUpFunction takes a single WasmExportedFunction (the exported JS wrapper).
 // With --wasm-inlining enabled (default), 'callee' will be inlined into 'caller'.
 // The resulting WasmCode will have inlining_positions for the inlined callee.
-%WasmTierUpFunction(inst, caller.index);
+%WasmTierUpFunction(inst.exports.caller);
 
 // At this point, WasmCode::GetInliningPosition(0) correctly reads inlining entry 0.
 // GetInliningPosition(1) would be the one-past-end OOB read.

