@@ -34,11 +34,13 @@ d8.file.execute("test/mjsunit/wasm/wasm-module-builder.js");
   let array_type_index = builder.addArray(kWasmI32, true);
 
   // Data segment with known i32 values (little-endian):
-  //   [0xAA000000, 0xBB000000, 0xCC000000]
+  let kElem0 = 0xAA;  // 170
+  let kElem1 = 0xBB;  // 187
+  let kElem2 = 0xCC;  // 204
   let data_segment = builder.addPassiveDataSegment([
-    0xAA, 0x00, 0x00, 0x00,  // 170
-    0xBB, 0x00, 0x00, 0x00,  // 187
-    0xCC, 0x00, 0x00, 0x00,  // 204
+    kElem0, 0x00, 0x00, 0x00,
+    kElem1, 0x00, 0x00, 0x00,
+    kElem2, 0x00, 0x00, 0x00,
   ]);
 
   // Uses Runtime_WasmArrayNewSegment (correct path).
@@ -55,13 +57,13 @@ d8.file.execute("test/mjsunit/wasm/wasm-module-builder.js");
   let init = instance.exports.init_from_data;
 
   // Validate correct data is read from the segment.
-  assertEquals(0xAA, init(0, 3, 0));
-  assertEquals(0xBB, init(0, 3, 1));
-  assertEquals(0xCC, init(0, 3, 2));
+  assertEquals(kElem0, init(0, 3, 0));
+  assertEquals(kElem1, init(0, 3, 1));
+  assertEquals(kElem2, init(0, 3, 2));
 
   // With a non-zero offset into the segment.
-  assertEquals(0xBB, init(4, 2, 0));
-  assertEquals(0xCC, init(4, 2, 1));
+  assertEquals(kElem1, init(4, 2, 0));
+  assertEquals(kElem2, init(4, 2, 1));
 
   // TODO(14034): Enable when array.new_data is allowed in constant
   // expressions. The bug in ConstantExpressionInterface::ArrayNewSegment
@@ -70,8 +72,8 @@ d8.file.execute("test/mjsunit/wasm/wasm-module-builder.js");
   // let builder2 = new WasmModuleBuilder();
   // let arr_type = builder2.addArray(kWasmI32, true);
   // let seg = builder2.addPassiveDataSegment([
-  //   0xAA, 0x00, 0x00, 0x00,
-  //   0xBB, 0x00, 0x00, 0x00,
+  //   kElem0, 0x00, 0x00, 0x00,
+  //   kElem1, 0x00, 0x00, 0x00,
   // ]);
   // let g = builder2.addGlobal(
   //   wasmRefType(arr_type), false, false,
@@ -84,6 +86,6 @@ d8.file.execute("test/mjsunit/wasm/wasm-module-builder.js");
   //     kGCPrefix, kExprArrayGet, arr_type])
   //   .exportFunc();
   // let inst2 = builder2.instantiate();
-  // assertEquals(0xAA, inst2.exports.get(0));
-  // assertEquals(0xBB, inst2.exports.get(1));
+  // assertEquals(kElem0, inst2.exports.get(0));
+  // assertEquals(kElem1, inst2.exports.get(1));
 })();
