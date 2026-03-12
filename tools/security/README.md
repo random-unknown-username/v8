@@ -9,7 +9,6 @@ the high-priority V8 attack surfaces listed in the research prompt:
 
 * `src/compiler/`
 * `src/maglev/`
-* `src/turbofan/`
 * `src/wasm/`
 * `src/objects/`
 * `src/heap/`
