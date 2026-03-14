@@ -163,6 +163,10 @@ transitioning macro FastArraySplice(
     actualDeleteCountNumber: Number): JSAny
     labels Bailout {
   const originalLength: Smi = Cast<Smi>(originalLengthNumber) otherwise Bailout;
+  // Guard against a sandbox-corrupted negative Smi length. A negative length
+  // would propagate into DoMoveElements as a negative count, causing a
+  // massive (negative-wrapped) memmove.
+  if (originalLength < 0) goto Bailout;
   const actualStart: Smi = Cast<Smi>(actualStartNumber) otherwise Bailout;
   const actualDeleteCount: Smi =
       Cast<Smi>(actualDeleteCountNumber) otherwise Bailout;

@@ -2700,6 +2700,15 @@ class FastElementsAccessor : public ElementsAccessorBase<Subclass, KindTraits> {
     constexpr ElementsKind kind = KindTraits::Kind;
     static_assert(IsFastElementsKind(kind));
     uint32_t length = Smi::ToUInt(receiver->length());
+    // Smi::ToUInt reinterprets negative Smis (possible via sandbox corruption)
+    // as large uint32_t values. Guard here: if the length is out of valid
+    // Smi range, bail out as if the array were empty (return undefined) to
+    // prevent new_length = length - 1 and the subsequent MoveElements call
+    // from receiving a huge (wrapping-negative) element count.
+    DCHECK_LE(length, static_cast<uint32_t>(Smi::kMaxValue));
+    if (V8_UNLIKELY(length > static_cast<uint32_t>(Smi::kMaxValue))) {
+      return ReadOnlyRoots(isolate).undefined_value();
+    }
     if (length == 0) return ReadOnlyRoots(isolate).undefined_value();
 
     if constexpr (IsSmiOrObjectElementsKind(kind)) {
@@ -2759,6 +2768,15 @@ class FastElementsAccessor : public ElementsAccessorBase<Subclass, KindTraits> {
     uint32_t length = Smi::ToUInt(receiver->length());
     DCHECK_LT(0, add_size);
     uint32_t elms_len = backing_store->ulength().value();
+    // Guard: Smi::ToUInt reinterprets negative Smis (possible via sandbox
+    // corruption) as large uint32_t values, which would cause MoveElements to
+    // receive a huge (wrapping-negative) count. If corruption is detected,
+    // throw a RangeError rather than crashing in MoveElements.
+    DCHECK_LE(length, static_cast<uint32_t>(Smi::kMaxValue));
+    if (V8_UNLIKELY(length > static_cast<uint32_t>(Smi::kMaxValue))) {
+      THROW_NEW_ERROR(isolate,
+                      NewRangeError(MessageTemplate::kInvalidArrayLength));
+    }
     // Check we do not overflow the new_length.
     DCHECK(add_size <= static_cast<uint32_t>(Smi::kMaxValue - length));
     uint32_t new_length = length + add_size;
