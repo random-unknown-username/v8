@@ -2135,10 +2135,10 @@ namespace {
 
 template <typename TSlot, typename AtomicOp, typename NonAtomicOp>
 void CopyOrMoveRangeImpl(Heap* heap, Tagged<HeapObject> dst_object,
-                         const TSlot dst_slot, const TSlot src_slot, int len,
-                         WriteBarrierMode mode, AtomicOp atomic_op,
+                         const TSlot dst_slot, const TSlot src_slot,
+                         uint32_t len, WriteBarrierMode mode, AtomicOp atomic_op,
                          NonAtomicOp non_atomic_op) {
-  DCHECK_GT(len, 0);
+  DCHECK_GT(len, 0u);
   DCHECK_NE(dst_object->map(), ReadOnlyRoots(heap).fixed_cow_array_map());
 
   MemoryChunk* dst_chunk = MemoryChunk::FromHeapObject(dst_object);
@@ -2226,7 +2226,7 @@ void Heap::CopyRange(Tagged<HeapObject> dst_object, const TSlot dst_slot,
   DCHECK(TSlot(dst_slot + len) <= src_slot || (src_slot + len) <= dst_slot);
 
   const auto atomic_callback = [](TSlot dst_slot, TSlot dst_end, TSlot src_slot,
-                                  int len) {
+                                  uint32_t len) {
     const AtomicSlot atomic_dst_end(dst_end);
     AtomicSlot dst(dst_slot);
     AtomicSlot src(src_slot);

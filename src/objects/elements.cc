@@ -2700,6 +2700,7 @@ class FastElementsAccessor : public ElementsAccessorBase<Subclass, KindTraits> {
     constexpr ElementsKind kind = KindTraits::Kind;
     static_assert(IsFastElementsKind(kind));
     uint32_t length = Smi::ToUInt(receiver->length());
+    SBXCHECK_LE(length, static_cast<uint32_t>(Smi::kMaxValue));
     if (length == 0) return ReadOnlyRoots(isolate).undefined_value();
 
     if constexpr (IsSmiOrObjectElementsKind(kind)) {
@@ -2757,6 +2758,7 @@ class FastElementsAccessor : public ElementsAccessorBase<Subclass, KindTraits> {
       DirectHandle<FixedArrayBase> backing_store, BuiltinArguments* args,
       uint32_t add_size, Where add_position) {
     uint32_t length = Smi::ToUInt(receiver->length());
+    SBXCHECK_LE(length, static_cast<uint32_t>(Smi::kMaxValue));
     DCHECK_LT(0, add_size);
     uint32_t elms_len = backing_store->ulength().value();
     // Check we do not overflow the new_length.
