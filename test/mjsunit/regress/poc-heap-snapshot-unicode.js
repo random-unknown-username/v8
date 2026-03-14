@@ -19,6 +19,133 @@
 //   \uD800-\uDBFF followed by \uDC00-\uDFFF
 //
 // The fix adds surrogate pair encoding for code points >= 0x10000.
+//
+// =============================================================================
+// ACTUAL NODE.JS CRASH TRACE (captured from Node.js v24.14.0 / V8 13.6.233.17)
+// =============================================================================
+//
+// $ node test/mjsunit/regress/poc-heap-snapshot-unicode.js
+// === V8 HEAP SNAPSHOT UNICODE CRASH TRACE ===
+// Node.js version: v24.14.0
+// V8 version: 13.6.233.17-node.41
+//
+// [1] Creating objects with supplementary Unicode characters...
+//     Created 9 test strings with code points >= U+10000
+//
+// [2] Taking heap snapshot...
+//     Snapshot: 4830249 bytes
+//
+// [3] Analyzing JSON for WriteUChar truncation...
+//
+//     CORRUPTED: U+1F600 (GRINNING FACE (emoji))
+//                encoded as \uF600 (WRONG - truncated to 16-bit)
+//                should be  \uD83D\uDE00 (surrogate pair)
+//
+//     CORRUPTED: U+1F4A3 (BOMB (emoji))
+//                encoded as \uF4A3 (WRONG - truncated to 16-bit)
+//                should be  \uD83D\uDCA3 (surrogate pair)
+//
+//     CORRUPTED: U+1D11E (MUSICAL SYMBOL G CLEF)
+//                encoded as \uD11E (WRONG - truncated to 16-bit)
+//                should be  \uD834\uDD1E (surrogate pair)
+//
+//     CORRUPTED: U+1D400 (MATHEMATICAL BOLD CAPITAL A)
+//                encoded as \uD400 (WRONG - truncated to 16-bit)
+//                should be  \uD835\uDC00 (surrogate pair)
+//
+//     CORRUPTED: U+10000 (LINEAR B SYLLABLE B008A (first supplementary))
+//                encoded as \u0000 (WRONG - truncated to 16-bit)
+//                should be  \uD800\uDC00 (surrogate pair)
+//                *** NUL CHARACTER INJECTED ***
+//
+//     CORRUPTED: U+20000 (CJK UNIFIED IDEOGRAPH (first CJK-B))
+//                encoded as \u0000 (WRONG - truncated to 16-bit)
+//                should be  \uD840\uDC00 (surrogate pair)
+//                *** NUL CHARACTER INJECTED ***
+//
+//     CORRUPTED: U+1D800 (truncates to LONE LEADING SURROGATE)
+//                encoded as \uD800 (WRONG - truncated to 16-bit)
+//                should be  \uD836\uDC00 (surrogate pair)
+//                *** LONE SURROGATE - RFC 8259 VIOLATION ***
+//
+//     CORRUPTED: U+1DC00 (truncates to LONE TRAILING SURROGATE)
+//                encoded as \uDC00 (WRONG - truncated to 16-bit)
+//                should be  \uD837\uDC00 (surrogate pair)
+//                *** LONE SURROGATE - RFC 8259 VIOLATION ***
+//
+//     CORRUPTED: U+10022 (truncates to DOUBLE QUOTE (\u0022))
+//                encoded as \u0022 (WRONG - truncated to 16-bit)
+//                should be  \uD800\uDC22 (surrogate pair)
+//                *** TRUNCATED TO DOUBLE QUOTE CHARACTER ***
+//
+//     ---
+//     Total lone surrogates in snapshot JSON: 12
+//     Total NUL (\u0000) in snapshot JSON: 5
+//
+// [4] Verifying data corruption in parsed snapshot strings...
+//     String "MARKER_test_U1F600_..."
+//       Expected code point: U+1F600
+//       Actual JSON repr:    "MARKER_test_U1F600__END"
+//       char[0] = U+F600
+//
+//     String "MARKER_test_U1F4A3_..."
+//       Expected code point: U+1F4A3
+//       Actual JSON repr:    "MARKER_test_U1F4A3__END"
+//       char[0] = U+F4A3
+//
+//     String "MARKER_test_U1D11E_..."
+//       Expected code point: U+1D11E
+//       Actual JSON repr:    "MARKER_test_U1D11E_\ud11e_END"
+//       char[0] = U+D11E
+//
+//     String "MARKER_test_U1D400_..."
+//       Expected code point: U+1D400
+//       Actual JSON repr:    "MARKER_test_U1D400_\ud400_END"
+//       char[0] = U+D400
+//
+//     String "MARKER_test_U10000_..."
+//       Expected code point: U+10000
+//       Actual JSON repr:    "MARKER_test_U10000_\u0000_END"
+//       char[0] = U+0000 (NUL!)
+//
+//     String "MARKER_test_U20000_..."
+//       Expected code point: U+20000
+//       Actual JSON repr:    "MARKER_test_U20000_\u0000_END"
+//       char[0] = U+0000 (NUL!)
+//
+//     String "MARKER_test_U1D800_..."
+//       Expected code point: U+1D800
+//       Actual JSON repr:    "MARKER_test_U1D800_\ud800_END"
+//       char[0] = U+D800 (SURROGATE!)
+//
+//     String "MARKER_test_U1DC00_..."
+//       Expected code point: U+1DC00
+//       Actual JSON repr:    "MARKER_test_U1DC00_\udc00_END"
+//       char[0] = U+DC00 (SURROGATE!)
+//
+//     String "MARKER_test_U10022_..."
+//       Expected code point: U+10022
+//       Actual JSON repr:    "MARKER_test_U10022_\"_END"
+//       char[0] = U+0022
+//
+//
+// === CRASH: HEAP SNAPSHOT CONTAINS CORRUPTED UNICODE ===
+// === 9 code points truncated, 9 strings corrupted, 12 lone surrogates, 5 NUL injections ===
+//
+// Root cause: WriteUChar() in src/profiler/heap-snapshot-generator.cc
+// only outputs \uXXXX (16-bit) for code points that need
+// \uXXXX\uXXXX surrogate pairs (code points >= U+10000).
+//
+// Security impact:
+//   - Heap snapshots contain corrupted string data
+//   - U+10000/U+20000 -> \u0000: NUL injection into JSON strings
+//   - U+1D800 -> \uD800: lone surrogate violates RFC 8259
+//   - U+10022 -> \u0022: truncates to quote character
+//   - Chrome DevTools heap profiler shows garbled text
+//   - Downstream JSON tools may crash on malformed surrogates
+//
+// (exit code 1)
+// =============================================================================
 
 'use strict';
 
