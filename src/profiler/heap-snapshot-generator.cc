@@ -3711,11 +3711,30 @@ void HeapSnapshotJSONSerializer::SerializeSnapshot() {
 
 static void WriteUChar(OutputStreamWriter* w, unibrow::uchar u) {
   static const char hex_chars[] = "0123456789ABCDEF";
-  w->AddString("\\u");
-  w->AddCharacter(hex_chars[(u >> 12) & 0xF]);
-  w->AddCharacter(hex_chars[(u >> 8) & 0xF]);
-  w->AddCharacter(hex_chars[(u >> 4) & 0xF]);
-  w->AddCharacter(hex_chars[u & 0xF]);
+  if (u >= 0x10000) {
+    // Supplementary plane characters must be encoded as a UTF-16 surrogate
+    // pair (\uHHHH\uHHHH) in JSON. Emitting a single \uXXXX would silently
+    // truncate the code point to its low 16 bits, which can introduce NUL
+    // bytes or unescaped quote/backslash characters that corrupt the JSON.
+    unibrow::uchar lead = 0xD800 + ((u - 0x10000) >> 10);
+    unibrow::uchar trail = 0xDC00 + ((u - 0x10000) & 0x3FF);
+    w->AddString("\\u");
+    w->AddCharacter(hex_chars[(lead >> 12) & 0xF]);
+    w->AddCharacter(hex_chars[(lead >> 8) & 0xF]);
+    w->AddCharacter(hex_chars[(lead >> 4) & 0xF]);
+    w->AddCharacter(hex_chars[lead & 0xF]);
+    w->AddString("\\u");
+    w->AddCharacter(hex_chars[(trail >> 12) & 0xF]);
+    w->AddCharacter(hex_chars[(trail >> 8) & 0xF]);
+    w->AddCharacter(hex_chars[(trail >> 4) & 0xF]);
+    w->AddCharacter(hex_chars[trail & 0xF]);
+  } else {
+    w->AddString("\\u");
+    w->AddCharacter(hex_chars[(u >> 12) & 0xF]);
+    w->AddCharacter(hex_chars[(u >> 8) & 0xF]);
+    w->AddCharacter(hex_chars[(u >> 4) & 0xF]);
+    w->AddCharacter(hex_chars[u & 0xF]);
+  }
 }
 
 void HeapSnapshotJSONSerializer::SerializeTraceTree() {
