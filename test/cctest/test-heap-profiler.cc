@@ -1435,6 +1435,66 @@ TEST(HeapSnapshotJSONSerialization) {
 }
 
 
+// Regression test: supplementary plane Unicode characters (code points >=
+// U+10000) must be serialized as UTF-16 surrogate pairs in the JSON heap
+// snapshot. Previously WriteUChar truncated the code point to its low 16 bits,
+// which could inject NUL bytes, unescaped quotes, or wrong characters.
+TEST(HeapSnapshotJSONSerializationSupplementaryChars) {
+  v8::Isolate* isolate = CcTest::isolate();
+  LocalContext env;
+  v8::HandleScope scope(isolate);
+  v8::HeapProfiler* heap_profiler = isolate->GetHeapProfiler();
+
+  // U+1F600 GRINNING FACE (😀), U+10000 (first supplementary character which
+  // maps to \u0000 without surrogate pairs), U+10022 (low 16 bits = 0x0022 =
+  // '"', potentially injecting an unescaped quote without the fix).
+#define SUPPLEMENTARY_STRING_LITERAL \
+  "\"\\u{1F600}\\u{10000}\\u{10022}\\u{1F4A9}\""
+  CompileRun(
+      "function C(s) { this.s = s; }\n"
+      "var c = new C(" SUPPLEMENTARY_STRING_LITERAL ");");
+  const v8::HeapSnapshot* snapshot = heap_profiler->TakeHeapSnapshot();
+  CHECK(ValidateSnapshot(snapshot));
+
+  v8::internal::TestJSONStream stream;
+  snapshot->Serialize(&stream, v8::HeapSnapshot::kJSON);
+  CHECK_GT(stream.size(), 0);
+  CHECK_EQ(1, stream.eos_signaled());
+  auto json = v8::base::OwnedVector<char>::NewForOverwrite(stream.size());
+  stream.WriteTo(json.as_vector());
+
+  // Verify that the snapshot JSON is valid (parseable).
+  v8::internal::OneByteResource* json_res =
+      new v8::internal::OneByteResource(json.as_vector());
+  v8::Local<v8::String> json_string =
+      v8::String::NewExternalOneByte(env.isolate(), json_res).ToLocalChecked();
+  v8::Local<v8::Context> context = v8::Context::New(env.isolate());
+  v8::Local<v8::Value> snapshot_parse_result =
+      v8::JSON::Parse(context, json_string).ToLocalChecked();
+  CHECK(snapshot_parse_result->IsObject());
+
+  // Verify the strings array in the snapshot contains the expected string
+  // with all supplementary characters correctly round-tripped.
+  env->Global()
+      ->Set(env.local(), v8_str("parsed"),
+            snapshot_parse_result.As<v8::Object>())
+      .FromJust();
+
+  // Find the string value via the snapshot structure and compare it to the
+  // reference value produced by the JS engine directly.
+  v8::Local<v8::Value> found = CompileRun(
+      "(function() {"
+      "  var strings = parsed.strings;"
+      "  var ref = " SUPPLEMENTARY_STRING_LITERAL ";"
+      "  for (var i = 0; i < strings.length; i++) {"
+      "    if (strings[i] === ref) return true;"
+      "  }"
+      "  return false;"
+      "})()");
+#undef SUPPLEMENTARY_STRING_LITERAL
+  CHECK(found->IsTrue());
+}
+
 TEST(HeapSnapshotJSONSerializationAborting) {
   LocalContext env;
   v8::HandleScope scope(env.isolate());
