@@ -1298,7 +1298,7 @@ TEST(HeapSnapshotJSONSerialization) {
   v8::HeapProfiler* heap_profiler = isolate->GetHeapProfiler();
 
 #define STRING_LITERAL_FOR_TEST \
-  "\"String \\n\\r\\u0008\\u0081\\u0101\\u0801\\u8001\""
+  "\"String \\n\\r\\u0008\\u0081\\u0101\\u0801\\u8001\\u{1F642}\""
   CompileRun(
       "function A(s) { this.s = s; }\n"
       "function B(x) { this.x = x; }\n"

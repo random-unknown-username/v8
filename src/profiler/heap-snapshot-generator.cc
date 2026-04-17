@@ -3896,11 +3896,27 @@ void HeapSnapshotJSONSerializer::SerializeSnapshot() {
 
 static void WriteUChar(OutputStreamWriter* w, unibrow::uchar u) {
   static const char hex_chars[] = "0123456789ABCDEF";
-  w->AddString("\\u");
-  w->AddCharacter(hex_chars[(u >> 12) & 0xF]);
-  w->AddCharacter(hex_chars[(u >> 8) & 0xF]);
-  w->AddCharacter(hex_chars[(u >> 4) & 0xF]);
-  w->AddCharacter(hex_chars[u & 0xF]);
+  auto write_u16 = [&](uint16_t value) {
+    w->AddString("\\u");
+    w->AddCharacter(hex_chars[(value >> 12) & 0xF]);
+    w->AddCharacter(hex_chars[(value >> 8) & 0xF]);
+    w->AddCharacter(hex_chars[(value >> 4) & 0xF]);
+    w->AddCharacter(hex_chars[value & 0xF]);
+  };
+
+  if (u <= 0xFFFF) {
+    write_u16(static_cast<uint16_t>(u));
+    return;
+  }
+
+  DCHECK_LE(u, unibrow::Utf16::kMaxNonSurrogateCharCode);
+  uint32_t supplementary_offset = static_cast<uint32_t>(u) - 0x10000;
+  uint16_t lead_surrogate =
+      static_cast<uint16_t>((supplementary_offset >> 10) + 0xD800);
+  uint16_t trail_surrogate =
+      static_cast<uint16_t>((supplementary_offset & 0x3FF) + 0xDC00);
+  write_u16(lead_surrogate);
+  write_u16(trail_surrogate);
 }
 
 void HeapSnapshotJSONSerializer::SerializeTraceTree() {
