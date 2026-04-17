@@ -2623,6 +2623,13 @@ void MarkCompactCollector::MarkLiveObjects() {
     parallel_marking_ = false;
   }
 
+  // If concurrent marking is still running (e.g., started during incremental
+  // marking but parallel marking was not used in the atomic pause), stop it
+  // now before entering the single-threaded serial marking phase.
+  if (!heap_->concurrent_marking()->IsStopped()) {
+    FinishConcurrentMarking();
+  }
+
   {
     TRACE_GC(heap_->tracer(), GCTracer::Scope::MC_MARK_ROOTS);
     MarkRootsFromConservativeStack(&root_visitor);
