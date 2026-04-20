@@ -19,6 +19,11 @@ macro TryFastArrayShift(implicit context: Context)(receiver: JSAny): JSAny
     return Undefined;
   }
 
+  // Guard against a sandbox-corrupted negative Smi length. A negative Smi
+  // would underflow newLength below zero, causing MoveElements to receive a
+  // huge (negative-wrapped) element count.
+  if (array.length < 0) goto Runtime;
+
   const newLength = array.length - 1;
 
   // Check that we're not supposed to right-trim the backing store, as
