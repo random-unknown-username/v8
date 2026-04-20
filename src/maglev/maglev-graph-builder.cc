@@ -5319,6 +5319,7 @@ ReduceResult MaglevGraphBuilder::BuildExtendPropertiesBackingStore(
   // However, an attacker able to corrupt heap memory can break this invariant,
   // in which case we'll get confused here, potentially causing a sandbox
   // violation. This CHECK defends against that.
+  SBXCHECK_GE(length, 0);
   return AddNewNode<ExtendPropertiesBackingStore>({property_array, receiver},
                                                   map, length);
 }

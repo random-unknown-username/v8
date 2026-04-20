@@ -147,7 +147,7 @@ class BacktrackStack {
   // The 'sp' is the index of the first empty element in the stack.
   int sp() const { return static_cast<int>(data_.size()); }
   void set_sp(uint32_t new_sp) {
-    DCHECK_LE(new_sp, sp());
+    SBXCHECK_LE(new_sp, static_cast<uint32_t>(sp()));
     data_.resize(new_sp);
   }
 
@@ -438,7 +438,6 @@ bool CheckSpecialClassRanges(uint32_t current_char,
       DCHECK_EQ(0,
                 word_character_map[0]);  // Character '\0' is not a word char.
       return word_character_map[current_char] != 0;
-      return true;
     }
     case StandardCharacterSet::kNotWord: {
       if constexpr (!is_one_byte) {
