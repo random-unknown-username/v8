@@ -3896,6 +3896,23 @@ void HeapSnapshotJSONSerializer::SerializeSnapshot() {
 
 static void WriteUChar(OutputStreamWriter* w, unibrow::uchar u) {
   static const char hex_chars[] = "0123456789ABCDEF";
+  if (u >= 0x10000) {
+    // Encode as UTF-16 surrogate pair for supplementary plane characters.
+    u -= 0x10000;
+    unibrow::uchar lead = 0xD800 + (u >> 10);
+    unibrow::uchar trail = 0xDC00 + (u & 0x3FF);
+    w->AddString("\\u");
+    w->AddCharacter(hex_chars[(lead >> 12) & 0xF]);
+    w->AddCharacter(hex_chars[(lead >> 8) & 0xF]);
+    w->AddCharacter(hex_chars[(lead >> 4) & 0xF]);
+    w->AddCharacter(hex_chars[lead & 0xF]);
+    w->AddString("\\u");
+    w->AddCharacter(hex_chars[(trail >> 12) & 0xF]);
+    w->AddCharacter(hex_chars[(trail >> 8) & 0xF]);
+    w->AddCharacter(hex_chars[(trail >> 4) & 0xF]);
+    w->AddCharacter(hex_chars[trail & 0xF]);
+    return;
+  }
   w->AddString("\\u");
   w->AddCharacter(hex_chars[(u >> 12) & 0xF]);
   w->AddCharacter(hex_chars[(u >> 8) & 0xF]);

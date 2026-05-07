@@ -240,7 +240,7 @@ AsmJsOffsetsResult DecodeAsmJsOffsets(
       functions.emplace_back();
       continue;
     }
-    DCHECK(decoder.checkAvailable(size));
+    if (!decoder.checkAvailable(size)) break;
     const uint8_t* table_end = decoder.pc() + size;
     uint32_t locals_size = decoder.consume_u32v("locals size");
     int function_start_position = decoder.consume_u32v("function start pos");

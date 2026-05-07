@@ -1435,6 +1435,63 @@ TEST(HeapSnapshotJSONSerialization) {
 }
 
 
+TEST(HeapSnapshotJSONSerializationSupplementaryUnicode) {
+  // Test that supplementary Unicode characters (above U+FFFF, like emoji)
+  // are correctly serialized as UTF-16 surrogate pairs in JSON output.
+  v8::Isolate* isolate = CcTest::isolate();
+  LocalContext env;
+  v8::HandleScope scope(isolate);
+  v8::HeapProfiler* heap_profiler = isolate->GetHeapProfiler();
+
+  // U+1F600 (GRINNING FACE) is a supplementary plane character that
+  // requires a surrogate pair (\uD83D\uDE00) in JSON.
+  CompileRun(
+      "function A(s) { this.s = s; }\n"
+      "var a = new A('\\uD83D\\uDE00');");
+  const v8::HeapSnapshot* snapshot = heap_profiler->TakeHeapSnapshot();
+  CHECK(ValidateSnapshot(snapshot));
+
+  v8::internal::TestJSONStream stream;
+  snapshot->Serialize(&stream, v8::HeapSnapshot::kJSON);
+  CHECK_GT(stream.size(), 0);
+  CHECK_EQ(1, stream.eos_signaled());
+  auto json = v8::base::OwnedVector<char>::NewForOverwrite(stream.size());
+  stream.WriteTo(json.as_vector());
+
+  // Verify that snapshot string is valid JSON.
+  v8::internal::OneByteResource* json_res =
+      new v8::internal::OneByteResource(json.as_vector());
+  v8::Local<v8::String> json_string =
+      v8::String::NewExternalOneByte(env.isolate(), json_res).ToLocalChecked();
+  v8::Local<v8::Context> context = v8::Context::New(env.isolate());
+  v8::Local<v8::Value> snapshot_parse_result =
+      v8::JSON::Parse(context, json_string).ToLocalChecked();
+  CHECK(snapshot_parse_result->IsObject());
+
+  // Verify the string containing the emoji is present in the strings array
+  // and correctly round-trips through JSON serialization/parsing.
+  v8::Local<v8::Object> parsed_snapshot =
+      snapshot_parse_result.As<v8::Object>();
+  v8::Local<v8::Array> strings_array =
+      parsed_snapshot->Get(env.local(), v8_str("strings"))
+          .ToLocalChecked()
+          .As<v8::Array>();
+  bool found_emoji = false;
+  v8::Local<v8::String> emoji_str = CompileRun("'\\uD83D\\uDE00'")
+                                        ->ToString(env.local())
+                                        .ToLocalChecked();
+  for (uint32_t i = 0; i < strings_array->Length(); ++i) {
+    v8::Local<v8::Value> elem =
+        strings_array->Get(env.local(), i).ToLocalChecked();
+    if (elem->IsString() && elem.As<v8::String>()->StrictEquals(emoji_str)) {
+      found_emoji = true;
+      break;
+    }
+  }
+  CHECK(found_emoji);
+}
+
+
 TEST(HeapSnapshotJSONSerializationAborting) {
   LocalContext env;
   v8::HandleScope scope(env.isolate());

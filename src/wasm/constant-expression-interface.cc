@@ -494,7 +494,7 @@ void ConstantExpressionInterface::ArrayNewSegment(
     }
 
     base::Vector<const uint8_t> source =
-        data->native_module()->wire_bytes() + offset;
+        data->native_module()->wire_bytes() + segment_source.offset() + offset;
     DirectHandle<WasmArray> array_value =
         isolate_->factory()->NewWasmArrayFromMemory(length, rtt, element_type,
                                                     source);
